@@ -1,0 +1,164 @@
+---
+title: "Analysis of World Happiness"
+format: html
+editor_options: 
+  chunk_output_type: console
+---
+
+## Project goal
+
+My goal in this project is to understand which features of a country's government are *correlated* with greater happiness. I will use visual and predictive techniques to conduct my analysis.
+
+```{r}
+library(tidyverse)
+library(patchwork)
+source("functions/prepareData.R")
+
+happiness_orig <- read_csv("data/happiness_data.csv")
+```
+
+## Making a plan for predictability
+
+My hope is that my findings will be relevant over time. Since I plan to just use the 2017 data to conduct my analysis, and I will use the 2016 data to evaluate the predictability. (No split is needed).
+
+
+## Cleaning and preprocessing the data for analysis
+
+The following code creates a version of the cleaned/pre-processed data in which we:
+
+1. Drop any countries that are missing the 2017 happiness score
+
+2. Use the Gallup gini index value
+
+3. Use forward-fill imputation
+
+```{r}
+happiness_clean <- prepareData(happiness_orig, 
+                               drop_countries_missing_2017_happiness = FALSE, 
+                               gini = "gallup", 
+                               imputation = "ffill")
+```
+
+
+## Analysis
+
+The following code conducts a basic analysis with the "year" as a an argument to make predictability analysis easy. 
+
+
+```{r}
+happinessAnalysis <- function(happiness_clean, 
+                              .year = 2017) {
+
+  
+  # filter to the selected year
+  happiness_year <- happiness_clean |> 
+    select(country, year, corruption, gini, happiness) |>
+    drop_na() |>
+    filter(year == .year)
+  # scatterplot of corruption vs happiness
+  gg_corruption <- ggplot(happiness_year, aes(x = corruption, y = happiness)) +
+    geom_point() +
+    geom_smooth(method = "lm") +
+    ggtitle(paste0(.year, " | cor=", 
+                   round(cor(happiness_year$corruption, happiness_year$happiness), 2)))
+  # scatterplot of gini index vs happiness
+  gg_gini <- ggplot(happiness_year, aes(x = gini, y = happiness)) +
+    geom_point() +
+    geom_smooth(method = "lm") +
+    ggtitle(paste0(.year, " | cor=", 
+                   round(cor(happiness_year$gini, happiness_year$happiness), 2)))
+  
+  # make a grid of plots using + from patchwork library
+  gg_corruption + gg_gini  
+}
+
+```
+
+
+
+
+```{r}
+happinessAnalysis(happiness_clean, .year = 2017)
+```
+
+
+## Predictability analysis
+
+
+
+```{r}
+happinessAnalysis(happiness_clean, .year = 2016)
+```
+
+
+## Stability analysis
+
+### Judgment calls
+
+Let's consider the stability of our analysis to our judgment calls
+
+```{r}
+# dropping countries missing 2017 happiness scores
+happiness_clean_drop <- prepareData(happiness_orig, 
+                                    drop_countries_missing_2017_happiness = TRUE,
+                                    gini = "gallup", 
+                                    imputation = "ffill")
+happinessAnalysis(happiness_clean_drop, .year = 2017)
+
+# using interpolation to impute rather than forward fill
+happiness_clean_interpolation <- prepareData(happiness_orig, 
+                                             drop_countries_missing_2017_happiness = FALSE,
+                                             gini = "gallup", 
+                                             imputation = "interpolation")
+happinessAnalysis(happiness_clean_interpolation, .year = 2017)
+
+# using world bank gini measure
+happiness_clean_wb <- prepareData(happiness_orig, 
+                                             drop_countries_missing_2017_happiness = FALSE,
+                                             gini = "world bank", 
+                                             imputation = "ffill")
+happinessAnalysis(happiness_clean_wb, .year = 2017)
+
+# using world bank gini measure with interpolation
+happiness_clean_wb_interpolation <- prepareData(happiness_orig, 
+                                             drop_countries_missing_2017_happiness = FALSE,
+                                             gini = "world bank", 
+                                             imputation = "interpolation")
+happinessAnalysis(happiness_clean_wb_interpolation, .year = 2017)
+```
+
+
+### Data perturbations
+
+Since all countries are already included in our dataset, sampling-based perturbations do not really make sense because there is no sampling uncertainty at the country-level (there is at the respondent level within each country, but we don't have access to that data). 
+
+However, the actual average variable value reported for each country has some uncertainty. While we have the standard deviation for each country's happiness score, we do not have this value for the other values. 
+
+```{r}
+# create 10 perturbed versions of the data
+perturbData <- function(happiness_data) {
+  happiness_data_perturbed <- happiness_data |>
+    # for each row:
+    drop_na(happiness) |>
+    rowwise() |>
+    # add a random value to each happiness score within 1 SD
+    mutate(happiness = happiness + runif(1, min = -happiness_sd, max = happiness_sd)) |>
+    ungroup()
+  return(happiness_data_perturbed)
+}
+```
+
+
+```{r}
+# orignal
+happinessAnalysis(happiness_clean, .year = 2017)
+# perturbed versions of the results
+happinessAnalysis(perturbData(happiness_clean), .year = 2017)
+happinessAnalysis(perturbData(happiness_clean), .year = 2017)
+happinessAnalysis(perturbData(happiness_clean), .year = 2017)
+happinessAnalysis(perturbData(happiness_clean), .year = 2017)
+happinessAnalysis(perturbData(happiness_clean), .year = 2017)
+happinessAnalysis(perturbData(happiness_clean), .year = 2017)
+```
+
+
