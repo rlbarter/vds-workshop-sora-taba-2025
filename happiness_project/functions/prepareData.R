@@ -43,7 +43,7 @@ prepareData <- function(happiness_data,
   } else if (imputation == "interpolation") {
     happiness_data <- happiness_data |>
       group_by(country) |>
-      mutate(across(where(is.numeric), ~ zoo::na.approx(., na.rm = FALSE))) 
+      mutate(across(where(is.numeric), ~zoo::na.approx(., na.rm = FALSE))) 
     
   }
   
